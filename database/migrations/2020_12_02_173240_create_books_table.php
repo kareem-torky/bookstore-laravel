@@ -22,6 +22,7 @@ class CreateBooksTable extends Migration
             $table->string('name', 255);
             $table->text('desc');
             $table->string('img', 50)->nullable();
+            $table->foreignId('cat_id')->constrained();
             $table->timestamps();
         });
     }

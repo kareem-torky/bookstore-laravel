@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Book;
+use App\Models\Cat;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
     public function index()
     {
         // SELECT * FROM books
-        $books = Book::paginate(5);
+        $books = Book::orderBy('id', 'desc')->paginate(5);
 
-        return view('index', [
+        return view('books.index', [
             'books' => $books
         ]);
     }
@@ -21,7 +23,7 @@ class BookController extends Controller
     {
         $book = Book::findOrFail($id);
        
-        return view('show', [
+        return view('books.show', [
             'book' => $book
         ]);
     }
@@ -30,7 +32,7 @@ class BookController extends Controller
     {
         $books = Book::where("name", "like", "%$keyword%")->get();
 
-        return view('search', [
+        return view('books.search', [
             'books' => $books,
             'keyword' => $keyword
         ]);
@@ -38,7 +40,10 @@ class BookController extends Controller
 
     public function create()
     {
-        return view('create');
+        $cats = Cat::select('id', 'name')->get();
+        return view('books.create', [
+            'cats' => $cats
+        ]);
     }
 
     public function store(Request $request)
@@ -47,12 +52,20 @@ class BookController extends Controller
         $request->validate([
             'name' => 'required|string|min:5|max:255',
             'desc' => 'required|string|min:10',
+            'img'  => 'required|image|mimes:jpg,png|max:512',
+            'cat_id' => 'required|integer|exists:cats,id'
         ]);
 
+        // upload 
+        // use Illuminate\Support\Facades\Storage;
+        $path = Storage::putFile('books', $request->file('img'));
+        
         // store in database
         Book::create([
             'name' => $request->name,
             'desc' => $request->desc, 
+            'img' => $path,
+            'cat_id' => $request->cat_id
         ]);
 
         return redirect( url('/books') );
@@ -61,51 +74,54 @@ class BookController extends Controller
     public function edit($id)
     {
         $book = Book::findOrFail($id);
+        $cats = Cat::select('id', 'name')->get();
 
-        return view('edit', [
-            'book' => $book
+        return view('books.edit', [
+            'book' => $book,
+            'cats' => $cats
         ]);
     }
-}
 
-
-
-/* 
-        SELECT name, `desc` FROM books 
-        Book::select("name", "desc")->get()
-
-        SELECT name, `desc` FROM books WHERE id > 2
-        Book::select("name", "desc")->where('id', '>', 2)->get()
-
-        SELECT name, `desc` FROM books WHERE id > 2 AND name like 'A%' 
-        Book::select("name", "desc")->where('id', '>', 2)->where('name', 'like', 'A%')->get()
-
-        SELECT name, `desc` FROM books WHERE id > 2 AND name like 'A%' ORDER BY name DESC
-
-        Book::select("name", "desc")
-        ->where('id', '>', 2)
-        ->where('name', 'like', 'A%')
-        ->orderBy('name', 'desc')
-        ->get();
-
+    public function update($id, Request $request)
+    {
+        // validation 
+        $request->validate([
+            'name' => 'required|string|min:5|max:255',
+            'desc' => 'required|string|min:10',
+            'img'  => 'nullable|image|mimes:jpg,png|max:512',
+            'cat_id' => 'required|integer|exists:cats,id'
+        ]);
         
-        SELECT name, `desc` FROM books WHERE id > 2 AND name like 'A%' ORDER BY name DESC LIMIT 3
+        $book = Book::findOrFail($id);
+        $path = $book->img;
 
-        Book::select("name", "desc")
-        ->where('id', '>', 2)
-        ->where('name', 'like', 'A%')
-        ->orderBy('name', 'desc')
-        ->take(3)
-        ->get();
+        if ($request->hasFile('img')) {
+            // delete old
+            Storage::delete($path);
 
-        orders 
-        SELECT id, address, phone FROM orders
-        WHERE id > 100 OR phone != "010123" 
-        ORDER BY phone ASC
+            // upload new 
+            $path = Storage::putFile('books', $request->file('img'));
+        }
 
-        $orders = Order::select("id", "address", "phone")
-        ->where("id", ">", 100)
-        ->orWhere("phone", "!=", "010123")
-        ->orderBy("phone")
-        ->get();
-    */ 
+        $book->update([
+            'name' => $request->name,
+            'desc' => $request->desc,
+            'img' => $path,
+            'cat_id' => $request->cat_id
+        ]);
+
+        return redirect( url("/books/show/{$id}") );
+    }
+
+    public function delete($id)
+    {
+        $book = Book::findOrFail($id);
+
+        $path = $book->img;
+        Storage::delete($path);
+
+        $book->delete();
+    
+        return redirect( url('/books') );
+    }
+}

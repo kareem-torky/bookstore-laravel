@@ -10,6 +10,11 @@ class Book extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'desc', 'img'
+        'name', 'desc', 'img', 'cat_id'
     ];
+
+    public function cat()
+    {
+        return $this->belongsTo(Cat::class);
+    }
 }
